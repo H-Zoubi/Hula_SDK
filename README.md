@@ -135,25 +135,72 @@ mid-flight.
 
 ## API overview
 
+Every one of `pyhula`'s 47 `UserApi` methods is wrapped -- with one
+deliberate exception, `Plane_fly_line_walking()`, whose own source in
+`pyhula` references a bare `type` (the Python builtin) instead of an
+actual parameter. That's a bug in the vendor SDK itself, not something
+worth papering over here with a guessed fix; it's reachable via `.raw`
+if you want to poke at it.
+
 ```python
-from hula_sdk import HulaDrone, Led, LedMode
+from hula_sdk import HulaDrone, Led, LedMode, FlipDirection, QrSensor
 
 with HulaDrone(ip) as drone:
     drone.connected       # bool
+
+    # flight -- tested against real hardware
     drone.takeoff(led=None)
     drone.land(led=None)
-    drone.hover(seconds, led=None)
-    drone.forward(distance_cm, speed=None, led=None)   # also .back / .left / .right / .up / .down
-    drone.turn_left(angle_deg, led=None)                # also .turn_right
+    drone.forward(distance_cm, speed=None, led=None)   # also .back / .left / .right
     drone.square(side_cm, speed=None)                   # forward -> right -> back -> left
 
-    drone.battery()        # int, 0-100
-    drone.coordinate()     # (x, y, z) cm, relative to takeoff
-    drone.attitude()       # (yaw, pitch, roll) degrees
-    drone.plane_id()       # int
+    # flight -- wrapped, not yet tested against hardware (warns on first call)
+    drone.up(height_cm, speed=None, led=None)           # also .down
+    drone.turn_left(angle_deg, led=None)                # also .turn_right
+    drone.hover(seconds, led=None)
+    drone.bounce(frequency, height_cm, led=None)
+    drone.fly_to(x_cm, y_cm, z_cm, led=None)
+    drone.circle(radius_cm, led=None)
+    drone.spin(num_rotations, led=None)
+    drone.flip(FlipDirection.FORWARD, led=None)
+    drone.curve_to(x_cm, y_cm, z_cm, counterclockwise=True, led=None)
 
-    drone.raw              # underlying pyhula.UserApi, for anything not wrapped
-                            # above (camera, QR/tag recognition, laser, etc.)
+    # sensing -- wrapped, untested
+    drone.set_obstacle_avoidance(enabled)
+    drone.follow_line(distance_cm, line_color=0)
+    drone.identify_tag(mode)
+    drone.align_to_qrcode(qr_id, sensor=QrSensor.CAMERA)
+    drone.recognize_qrcode(qr_id, sensor=QrSensor.CAMERA)
+    drone.track_qrcode(qr_id, seconds)
+    drone.read_color(mode=1)
+
+    # lighting / camera / attachments -- wrapped, untested
+    drone.set_light(Led(...), seconds)
+    drone.open_video_window()
+    drone.set_video_stream(enabled)
+    drone.set_recording(enabled)
+    drone.take_photo()
+    drone.set_camera_angle(direction, angle)
+    drone.set_qr_positioning(enabled)
+    drone.fire_laser(laser_type, frequency=10, ammo=100)
+    drone.laser_hit()
+    drone.set_electromagnet(attract)
+    drone.set_clamp(is_open, angle=0)
+    drone.arm()
+    drone.disarm()
+
+    # telemetry -- battery/coordinate/attitude/plane_id tested,
+    # the rest wrapped-but-untested
+    drone.battery()         # int, 0-100
+    drone.coordinate()      # (x, y, z) cm, relative to takeoff
+    drone.attitude()        # (yaw, pitch, roll) degrees
+    drone.plane_id()        # int
+    drone.obstacles()       # {'forward'/'back'/'left'/'right': bool}
+    drone.acceleration()    # (x, y, z)
+    drone.velocity()        # (x, y, z)
+    drone.tof_height()      # int
+
+    drone.raw               # underlying pyhula.UserApi escape hatch
 ```
 
 `led` parameters take an `hula_sdk.Led` (a typed version of the raw
@@ -167,6 +214,33 @@ Led(r=16, g=15, b=100, mode=LedMode.RAINBOW)
 exception is raised mid-flight (tracked via an internal "are we
 airborne" flag, so it won't call touchdown on a drone that never took
 off).
+
+## Tested vs untested
+
+Given that the small slice of the API exercised so far turned up two
+real connection bugs, two cosmetic ones, and a process-killing
+low-battery behavior, "the signature matches the docs" is not treated as
+equivalent to "verified working" anywhere in this README or in the code.
+Methods below `square()` in `client.py` are wrapped but genuinely
+unverified against hardware -- calling any of them raises a `UserWarning`
+the first time (once per method, per process), naming the method and
+pointing back here.
+
+| Verified against real hardware | Wrapped, never called against hardware | Not wrapped |
+|---|---|---|
+| `connect`, `battery`, `coordinate`, `attitude`, `plane_id`, `takeoff`, `land`, `forward`, `back`, `left`, `right` | `up`, `down`, `turn_left`, `turn_right`, `hover`, `bounce`, `fly_to`, `circle`, `spin`, `flip`, `curve_to`, `set_obstacle_avoidance`, `follow_line`, `identify_tag`, `align_to_qrcode`, `recognize_qrcode`, `track_qrcode`, `read_color`, `set_light`, `open_video_window`, `set_video_stream`, `set_recording`, `take_photo`, `set_camera_angle`, `set_qr_positioning`, `fire_laser`, `laser_hit`, `set_electromagnet`, `set_clamp`, `arm`, `disarm`, `obstacles`, `acceleration`, `velocity`, `tof_height`, non-zero `Led` values | `Plane_fly_line_walking` (broken in `pyhula` itself -- see above) |
+
+Also found while cross-referencing the vendor docs against the actually
+installed 1.1.4: `single_fly_Optical_flow_alignment`,
+`single_fly_Proactive_alignment`, and `single_fly_Anticipatory_recognition`
+are documented in the Chinese V3 PDF but don't exist in any version
+published to PyPI -- same story as the `speed` parameter, vendor-exclusive
+1.1.7 only.
+
+When you do get a chance to test more of these (battery permitting):
+low-risk first -- the telemetry getters (`obstacles`, `acceleration`,
+`velocity`, `tof_height`) don't move the drone. Things like `arm()`
+(spins the propellers) deserve someone standing by first.
 
 ## Known limitations
 
@@ -197,13 +271,15 @@ venv\Scripts\python.exe -m unittest discover tests -v
 
 Tests cover the `_netfix` patch logic and `Led` conversion directly
 against real sockets, using RFC 5737 documentation-range addresses
-(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) so they're safe to
-run anywhere -- no drone or real network required.
+(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`), plus the
+`@_untested` warning mechanism against a fake `_api`. All of it is safe
+to run anywhere -- no drone, no real network, no `pyhula` install
+required.
 
 ## Repository layout
 
 ```
-hula_sdk/        the package: client.py, led.py, exceptions.py, _netfix.py
+hula_sdk/        the package: client.py, led.py, constants.py, exceptions.py, _netfix.py
 examples/        runnable scripts (see table above)
 tests/           unit tests, no hardware required
 docs/            vendor PDFs + an English translation of the Chinese one
