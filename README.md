@@ -1,132 +1,218 @@
-# HULA drone dev setup
+# hula-sdk
 
-`pyhula` (HighGreat/hg-fly's SDK for the HULA educational drone) only ships
-compiled wheels for Python 3.6 on Windows and internally needs `tkinter`, so
-it requires a full Python 3.6 install (not the embeddable zip).
+A working Python SDK for the [HighGreat](https://en.hg-fly.com) **HULA**
+educational drone.
 
-This machine already has a per-user Python 3.6.8 install registered with the
-`py` launcher (`py -3.6`), so `venv/` here was created from that instead of
-reinstalling Python 3.6.7 from the bundled installer.
+The vendor's own `pyhula` package has two undocumented bugs that make
+`connect()` fail outright on Windows. `hula-sdk` wraps `pyhula`, patches
+both bugs, and exposes a cleaner, typed API on top of it. Verified against
+real hardware on `pyhula` 1.0.8 (connect, telemetry, takeoff, flight,
+landing) and re-verified on the current PyPI release, 1.1.4 (connect,
+telemetry -- flight not yet re-tested on 1.1.4).
 
-**Status: working.** Verified against the real drone — `connect()` returns
-`True`, telemetry reads back, and the drone takes off / flies / lands under
-script control.
+## Quickstart
 
-## What's installed
+```bash
+git clone <this repo>
+cd hula-sdk
+py -3.6 -m venv venv
+venv\Scripts\python.exe -m pip install -e .
+```
 
-`venv/` — Python 3.6 virtualenv with:
+```python
+from hula_sdk import HulaDrone
 
-- **`pyhula` 1.0.8** — the version `HulaSetup.pdf` calls for, from
-  `installation instructions/installation instructions/`. This matters: the
-  API surface differs between versions (see "API version differences"
-  below). A 1.1.7 wheel also shipped in this folder (copied to
-  `wheels/pyhula-1.1.7-...whl`; the original download was named `...whl.zip`,
-  which is just a renamed wheel) — it is *not* what's installed.
-- `opencv-python` 4.6.0.66, `psutil` 7.0.0, `protobuf` 3.19.6,
-  `onnxruntime` 1.10.0, `flatbuffers`, `lxml`, `fastcrc`, `pymavlink`,
-  `numpy` — matching the versions in `HulaSetup.pdf`
+with HulaDrone("192.168.1.62") as drone:
+    print("battery:", drone.battery())
+    drone.takeoff()
+    drone.square(60)
+    drone.land()
+```
 
-`pyhula`'s own `userapi.py` adds its bundled `f09-lite-trans/` folder
-(ffmpeg DLLs) to `PATH` at import time, so — unlike what `HulaSetup.pdf`
-says — there was no need to extract `f09-dlls.zip` into
-`C:\Windows\System32`. The VC++ runtime DLLs it also needs
-(`msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`) were already
-present in `C:\Windows\System32`, so `VC_redist.x64.exe` wasn't run either.
+See `examples/` for runnable scripts:
+
+| Script | What it does |
+|---|---|
+| [`connect_and_read_telemetry.py`](examples/connect_and_read_telemetry.py) | Connects and prints battery/coordinate/attitude/plane ID. Doesn't fly. |
+| [`basic_takeoff_land.py`](examples/basic_takeoff_land.py) | Simplest possible flight: connect, take off, land. |
+| [`square_flight.py`](examples/square_flight.py) | Flies a 60cm square and lands. |
+
+## Requirements
+
+- **Windows.** `pyhula` only ships compiled Windows wheels.
+- **Python 3.6**, specifically -- this isn't a choice `hula-sdk` makes,
+  it's forced by the vendor. Every `pyhula` wheel on PyPI, including the
+  current latest (1.1.4), is built `cp36-cp36m`: Python 3.6 only, no
+  forward-compatible ABI. It also needs `tkinter`, so it needs a full
+  Python 3.6 install, not the embeddable zip.
+- The drone and this PC on the **same Wi-Fi network** ("networking
+  mode" -- see below). `hula-sdk` does not work with the drone's own
+  direct-connection hotspot; see "The bugs this fixes."
+
+All of `pyhula`'s own dependencies (`opencv-python`, `psutil`, `numpy`,
+etc.) are kept at the newest version that still ships a `cp36` wheel.
+`opencv-python` is the one exception worth knowing about: its newest
+release (5.x) dropped prebuilt Python 3.6 wheels entirely, so installing
+it means compiling from source with a full Visual Studio + CMake
+toolchain. `opencv-python==4.6.0.66` is the last version with a working
+prebuilt wheel, so that's what's pinned in practice (via `pyhula`'s own
+`install_requires`, not `hula-sdk`'s).
 
 ## Network setup
 
-The drone runs in **networking mode** (joined to the same Wi-Fi as this PC),
-not its own AP. To switch modes: with the drone powered on, press the power
-button **three times quickly**. Purple flashing = direct/AP mode, white
-flashing = networking mode, solid green = joined to a router successfully.
-Handing the drone the Wi-Fi credentials is done through the **Hula phone
-app** (`com.highgreat.hula`) — there's no SDK path for provisioning.
+The drone needs to be in **networking mode**, joined to the same Wi-Fi as
+this PC -- not its own direct-connection hotspot.
 
-The drone currently appears on the LAN as **`hg-35` / `192.168.1.62`**, set
-as `DRONE_IP` in the scripts. That's a DHCP lease, so it can change after a
-reboot — if `connect()` starts failing, re-check the address in the router's
-client list first. A DHCP reservation would pin it permanently.
+- With the drone powered on, press the power button **three times
+  quickly** to switch modes. Purple flashing = direct/AP mode, white
+  flashing = networking mode, solid green = successfully joined a router.
+- Handing the drone your Wi-Fi credentials is done through the **Hula
+  phone app** (`com.highgreat.hula`, on Google Play / the App Store) --
+  there's no SDK-level way to provision it.
+- Once connected, find the drone's IP from your router's client list
+  (it'll show up as something like `hg-<id>`). That's a DHCP lease, so it
+  can change after a router reboot -- a static DHCP reservation on your
+  router avoids that.
 
-## Running
+## The bugs this fixes
 
-```bash
-venv/Scripts/python.exe test_connect.py
-```
+Both are patched in [`hula_sdk/_netfix.py`](hula_sdk/_netfix.py), applied
+automatically by `HulaDrone` -- you don't need to call anything yourself.
 
-Connects and prints battery, coordinates, yaw/pitch/roll, and plane ID.
-Does not fly.
+1. **Local bind uses the wrong address.** `pyhula`'s UDP/TCP listener
+   threads bind their *local* listening socket to the `server_ip` you
+   pass to `connect()` -- i.e. the drone's address -- instead of to this
+   PC's own address or a wildcard. Windows rejects that outright:
+   ```
+   OSError: [WinError 10049] The requested address is not valid in its context
+   ```
+   because you can't bind a local socket to an address you don't own.
+   Fixed by rewriting every bind's IP to `0.0.0.0` (all interfaces).
 
-```bash
-venv/Scripts/python.exe src/square_flight.py
-```
+2. **The TCP control channel ignores `server_ip` entirely** and always
+   dials the literal `192.168.100.1:8888` -- apparently a leftover
+   default from the vendor's own reference network (that's the drone's
+   *own* address in its direct/AP Wi-Fi mode, which is why that mode
+   looks like it should work and doesn't, once bug #1 is also in play).
+   Fixed by redirecting that exact address to the real drone IP.
 
-Takes off, flies a 60cm square, lands. Needs clear space.
-
-Console output includes Chinese status strings (`连接成功` = connected).
-On a `cp1252` console these can crash the SDK's own error paths with
-`UnicodeEncodeError` — prefix with `PYTHONIOENCODING=utf-8` if that happens.
-
-## Required workaround: `hula_net_fix.py`
-
-pyhula has two hardcoded-address bugs that make `connect()` fail on Windows.
-[hula_net_fix.py](hula_net_fix.py) patches both at the socket layer; call
-`hula_net_fix.patch(DRONE_IP)` **before** `import pyhula`. Without it you get
-`OSError: [WinError 10049] The requested address is not valid in its context`
-from `UDP_RECIVE_THREAD` and the connection never completes.
-
-1. **Local bind uses the wrong address.** Its UDP/TCP listener threads bind
-   their *local* listening socket to the `server_ip` you passed to
-   `connect()` — i.e. the drone's address — instead of this PC's own address
-   or a wildcard. Windows rejects that (you can't bind a local socket to an
-   address you don't own). Patched by rewriting every bind to `0.0.0.0`.
-2. **TCP control channel ignores `server_ip`.** It always dials the literal
-   `192.168.100.1:8888`, apparently a leftover default from the vendor's
-   reference setup (that's the drone's address in its own AP mode). Patched
-   by redirecting that exact address to the real `DRONE_IP`.
-
-Neither is documented, and neither needs any change to Windows network
-config — an earlier attempt using a static IP alias plus `netsh portproxy`
-worked around #2 at the OS level, but it's unnecessary and it disabled DHCP
-on the Wi-Fi adapter as a side effect. Keep the fix in code.
-
-Two other SDK bugs show up in tracebacks but are cosmetic — they only mask
-real errors rather than cause them:
+Two more bugs show up in tracebacks but are cosmetic -- they mask real
+errors rather than cause them, and don't need patching:
 
 - `AttributeError: type object 'socket' has no attribute 'error'` in
-  `TCP_SERVER_THREAD` — the SDK shadowed the `socket` module with the
-  `socket.socket` class, so its own `except socket.error` handler crashes.
-- `UnicodeEncodeError` from `cp1252` when it tries to print a Chinese
-  error message.
+  `TCP_SERVER_THREAD` -- the SDK shadowed the `socket` module with the
+  `socket.socket` class, so its own `except socket.error` handler
+  crashes when it actually tries to handle an error.
+- `UnicodeEncodeError` from `cp1252` when it prints a Chinese status
+  message on a non-UTF-8 console. Run with `PYTHONIOENCODING=utf-8` if
+  you hit this outside of `hula-sdk` (e.g. talking to `pyhula` directly).
 
-## API version differences (1.0.8 vs 1.1.7)
+## API version differences
 
-The two PDFs document **different API versions**, which is a live trap:
+`pyhula`'s two reference PDFs in `docs/` document **different API
+versions**, and the difference isn't cosmetic:
 
-| | 1.0.8 (installed) | 1.1.7 |
+| | Every version on PyPI (through 1.1.4) | 1.1.7 (vendor-distributed only, not on PyPI) |
 |---|---|---|
 | Directional methods | `single_fly_forward(distance, led)` | `single_fly_forward(distance, speed, led)` |
-| Matching doc | `Hula_API_English.pdf` | `Hula Python接口说明 V3_20250724.pdf` |
+| Matching doc | `Hula_API_English.pdf` | `Hula_Python_API_V3_20250724_EN.md` |
 
-Passing a speed value to 1.0.8 puts it in the `led` slot and fails with
-`TypeError: 'int' object is not subscriptable` inside `setRgb` — mid-flight,
-after takeoff. `src/square_flight.py` wraps its flight sequence in
-`try/finally` so the drone still lands when that kind of error hits.
+`pip install pyhula` gets you the no-`speed` signature -- PyPI's latest
+(1.1.4) still doesn't have it. The `speed`-capable 1.1.7 build only
+exists as a wheel the vendor handed out directly (kept in `vendor/` here
+for reference); it isn't published anywhere pip can reach.
 
-`led` (when given) is a dict: `{'r':0,'g':0,'b':0,'mode':1}`, where mode is
-1/solid, 2/off, 4/RGB cycle, 16/rainbow, 32/flashing, 64/breathing.
+Passing a speed value to a no-`speed` version lands in the `led` slot
+instead and fails with `TypeError: 'int' object is not subscriptable`
+inside `setRgb` -- *after* takeoff, mid-flight.
 
-Full method list with docstrings (in Chinese) is in
-`venv/Lib/site-packages/pyhula/userapi.py` — that's the authoritative
-signature reference for whichever version is actually installed.
+`HulaDrone`'s movement methods (`forward`, `back`, `left`, `right`, `up`,
+`down`) handle this automatically: they inspect the installed `pyhula`'s
+actual method signature and only pass `speed` through if that version
+supports it, raising a clear `TypeError` up front if you ask for a speed
+it can't do, rather than failing deep inside the SDK's LED-setting code
+mid-flight.
 
-## Note: activation
+## API overview
 
-PyPI's `pyhula` page states the SDK "needs to be activated before it can be
-used" and to contact the author (service@hg-fly.com). No activation check
-has been hit in practice — connect, telemetry, and flight all work without
-one.
+```python
+from hula_sdk import HulaDrone, Led, LedMode
 
-## Note: another setup exists
+with HulaDrone(ip) as drone:
+    drone.connected       # bool
+    drone.takeoff(led=None)
+    drone.land(led=None)
+    drone.hover(seconds, led=None)
+    drone.forward(distance_cm, speed=None, led=None)   # also .back / .left / .right / .up / .down
+    drone.turn_left(angle_deg, led=None)                # also .turn_right
+    drone.square(side_cm, speed=None)                   # forward -> right -> back -> left
 
-`C:\dev\drone` has a separate, earlier setup (pyhula 1.1.5) built from the
-same family of docs. It's independent — nothing here touched it.
+    drone.battery()        # int, 0-100
+    drone.coordinate()     # (x, y, z) cm, relative to takeoff
+    drone.attitude()       # (yaw, pitch, roll) degrees
+    drone.plane_id()       # int
+
+    drone.raw              # underlying pyhula.UserApi, for anything not wrapped
+                            # above (camera, QR/tag recognition, laser, etc.)
+```
+
+`led` parameters take an `hula_sdk.Led` (a typed version of the raw
+`{'r':.., 'g':.., 'b':.., 'mode':..}` dict `pyhula` expects):
+
+```python
+Led(r=16, g=15, b=100, mode=LedMode.RAINBOW)
+```
+
+`HulaDrone` used as a context manager lands the drone automatically if an
+exception is raised mid-flight (tracked via an internal "are we
+airborne" flag, so it won't call touchdown on a drone that never took
+off).
+
+## Known limitations
+
+- **Windows + Python 3.6 only**, inherited from `pyhula`'s compiled
+  extension.
+- **One drone per process.** The bind/connect patches are applied
+  globally to `socket.socket`, and the connect-redirect target is a
+  single module-level value -- controlling two physical drones
+  concurrently from one Python process isn't supported. Use separate
+  processes if you need that.
+- No activation issue has been hit in practice, despite PyPI's `pyhula`
+  page stating the SDK "needs to be activated" -- connect, telemetry,
+  and flight all work without one so far.
+- **pyhula >=1.1.x hard-exits the whole process on low battery.** If the
+  drone reports under 10%, `connect()` doesn't return `False` or raise --
+  it prints `battery<10，退出程序` and terminates the process outright
+  (looks like an `os._exit()` or similar buried in the compiled SDK).
+  `HulaDrone.connect()`'s `HulaConnectionError` never gets a chance to
+  fire in that case. Not something `hula-sdk` can intercept without
+  knowing exactly which call does it; charge the drone above 10% before
+  connecting.
+
+## Development
+
+```bash
+venv\Scripts\python.exe -m unittest discover tests -v
+```
+
+Tests cover the `_netfix` patch logic and `Led` conversion directly
+against real sockets, using RFC 5737 documentation-range addresses
+(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) so they're safe to
+run anywhere -- no drone or real network required.
+
+## Repository layout
+
+```
+hula_sdk/        the package: client.py, led.py, exceptions.py, _netfix.py
+examples/        runnable scripts (see table above)
+tests/           unit tests, no hardware required
+docs/            vendor PDFs + an English translation of the Chinese one
+vendor/          offline install media (Python 3.6 installer, DLLs, older
+                 pyhula wheels) -- gitignored, kept locally for reference
+venv/            Python 3.6 virtualenv -- gitignored
+```
+
+## See also
+
+`C:\dev\drone` has a separate, independent setup (`pyhula` 1.1.5) built
+earlier from the same family of vendor docs. It's unrelated to this repo.
