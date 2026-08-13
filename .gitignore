@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+
+# Vendor installers, wheels, and extracted archives (hundreds of MB).
+# Keep these locally -- they're the offline install sources -- but they
+# don't belong in git.
+installation instructions/
+installation instructions.zip
+wheels/
+*.whl
+*.whl.zip
+pyhula-*-cp36-cp36m-win_amd64.whl/
