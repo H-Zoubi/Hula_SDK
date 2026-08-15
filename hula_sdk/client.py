@@ -212,8 +212,17 @@ class HulaDrone:
 
     def set_light(self, led: Led, seconds: float) -> bool:
         """Sets LED color/mode without blocking flight. Unlike the `led`
-        parameters elsewhere, this takes a duration."""
-        return self._api.single_fly_lamplight(led.r, led.g, led.b, seconds, int(led.mode))
+        parameters elsewhere, this takes a duration.
+
+        pyhula's single_fly_lamplight has an undocumented argument-order bug:
+        confirmed against real hardware that asking for red produces green
+        and asking for green produces blue -- i.e. the (r, g, b) slots it
+        takes aren't r, g, b. Working from those two swaps: what we'd pass
+        as r drives the physical green channel, and what we'd pass as g
+        drives physical blue, so by elimination b must drive physical red.
+        Passing (g, b, r) compensates for that so callers still get the
+        color they actually asked for."""
+        return self._api.single_fly_lamplight(led.g, led.b, led.r, seconds, int(led.mode))
 
     # -- camera / video: wrapped, and *attempted* against hardware, but not
     # verified working -- see the README's "Known limitations" for what
