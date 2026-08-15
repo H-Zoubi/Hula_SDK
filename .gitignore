@@ -12,3 +12,8 @@ dist/
 # Vendor installers, wheels, and extracted archives (hundreds of MB).
 # Kept locally as offline install sources -- not part of the package.
 vendor/
+
+# Runtime artifact from pyhula's video/RTP pipeline (see README's
+# "Tested vs untested" -- its connection line is malformed, which is why
+# the video decoder never gets a valid frame).
+tmp.sdp

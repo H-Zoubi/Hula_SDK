@@ -12,14 +12,11 @@ from hula_sdk.client import HulaDrone, _warned_methods
 
 
 class _FakeApi:
-    def single_fly_hover_flight(self, seconds, led):
-        return None
+    def single_fly_Line_walking(self, fun_id, dist, way_color):
+        return 1
 
     def get_battery(self):
         return 50
-
-    def get_accelerated_speed(self):
-        return [0, 0, 0]
 
 
 def _make_drone():
@@ -36,17 +33,17 @@ def _make_drone():
 
 class TestUntestedWarning(unittest.TestCase):
     def test_untested_method_warns_once_per_process(self):
-        _warned_methods.discard("HulaDrone.hover")
+        _warned_methods.discard("HulaDrone.follow_line")
         drone = _make_drone()
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            drone.hover(1)
-            drone.hover(1)
+            drone.follow_line(100)
+            drone.follow_line(100)
 
         user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
         self.assertEqual(len(user_warnings), 1)
-        self.assertIn("hover", str(user_warnings[0].message))
+        self.assertIn("follow_line", str(user_warnings[0].message))
         self.assertIn("not been verified against real hardware", str(user_warnings[0].message))
 
     def test_tested_method_does_not_warn(self):

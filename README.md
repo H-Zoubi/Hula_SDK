@@ -6,9 +6,15 @@ educational drone.
 The vendor's own `pyhula` package has two undocumented bugs that make
 `connect()` fail outright on Windows. `hula-sdk` wraps `pyhula`, patches
 both bugs, and exposes a cleaner, typed API on top of it. Verified against
-real hardware on `pyhula` 1.0.8 (connect, telemetry, takeoff, flight,
-landing) and re-verified on the current PyPI release, 1.1.4 (connect,
-telemetry -- flight not yet re-tested on 1.1.4).
+real hardware on both `pyhula` 1.0.8 and the current PyPI release,
+1.1.4 -- see "Tested vs untested" for exactly which of the 47 `UserApi`
+methods that covers (33 of them, as of this writing).
+
+**This is not the official SDK.** `pyhula` itself is still HighGreat's,
+unmodified, installed straight from PyPI. Everything built on top of it
+here -- the `hula_sdk/` wrapper, the bug fixes above, the English
+translation in `docs/`, and this README -- was written mainly by AI (with
+a human driving, debugging against real hardware, and reviewing).
 
 ## Quickstart
 
@@ -36,6 +42,17 @@ See `examples/` for runnable scripts:
 | [`connect_and_read_telemetry.py`](examples/connect_and_read_telemetry.py) | Connects and prints battery/coordinate/attitude/plane ID. Doesn't fly. |
 | [`basic_takeoff_land.py`](examples/basic_takeoff_land.py) | Simplest possible flight: connect, take off, land. |
 | [`square_flight.py`](examples/square_flight.py) | Flies a 60cm square and lands. |
+| [`extended_telemetry.py`](examples/extended_telemetry.py) | Reads every telemetry getter. Doesn't fly. |
+| [`flight_tricks.py`](examples/flight_tricks.py) | Interactively exercises the untested flight methods (hover, turns, bounce, circle, spin, flip, curved flight, line-following) -- confirms each step before running it. |
+| [`sensing_and_camera.py`](examples/sensing_and_camera.py) | Interactively exercises QR/tag/color sensing and camera/video/lighting methods. Ground-based. |
+| [`attachments_and_extras.py`](examples/attachments_and_extras.py) | Interactively exercises arm/disarm, electromagnet, clamp, laser -- only meaningful if your drone has those attachments (this project's test unit doesn't). |
+| [`wait_for_qrcode.py`](examples/wait_for_qrcode.py) | Polls `recognize_qrcode()` in a loop until it gets a match or you Ctrl+C -- works around the SDK's short (~300ms) single-shot recognition window. |
+| [`camera_stream.py`](examples/camera_stream.py) | Tests (and disproves) a warmup-delay theory for the broken video pipeline. See "The camera/video pipeline" below. |
+
+The middle three use a shared `_stepper.py` helper: at each maneuver, Enter
+runs it, `s` skips it, `q` stops early. One step failing doesn't stop the
+rest -- and `HulaDrone`'s context manager still lands the drone if you
+quit early or something raises mid-sequence.
 
 ## Requirements
 
@@ -60,15 +77,21 @@ prebuilt wheel, so that's what's pinned in practice (via `pyhula`'s own
 
 ## Network setup
 
+**A mobile phone is currently required**, separately from this SDK, for
+two things: activating the drone, and handing it your home Wi-Fi
+credentials. There's no SDK-level or PC-side way to do either -- only the
+Hula phone app (`com.highgreat.hula`, on Google Play / the App Store)
+talks to the drone for setup. Once that's done, everything else in this
+repo runs from the PC.
+
 The drone needs to be in **networking mode**, joined to the same Wi-Fi as
 this PC -- not its own direct-connection hotspot.
 
 - With the drone powered on, press the power button **three times
   quickly** to switch modes. Purple flashing = direct/AP mode, white
   flashing = networking mode, solid green = successfully joined a router.
-- Handing the drone your Wi-Fi credentials is done through the **Hula
-  phone app** (`com.highgreat.hula`, on Google Play / the App Store) --
-  there's no SDK-level way to provision it.
+- Handing the drone your Wi-Fi credentials is done through the phone app
+  -- there's no SDK-level way to provision it.
 - Once connected, find the drone's IP from your router's client list
   (it'll show up as something like `hg-<id>`). That's a DHCP lease, so it
   can change after a router reboot -- a static DHCP reservation on your
@@ -189,8 +212,7 @@ with HulaDrone(ip) as drone:
     drone.arm()
     drone.disarm()
 
-    # telemetry -- battery/coordinate/attitude/plane_id tested,
-    # the rest wrapped-but-untested
+    # telemetry -- all tested against real hardware
     drone.battery()         # int, 0-100
     drone.coordinate()      # (x, y, z) cm, relative to takeoff
     drone.attitude()        # (yaw, pitch, roll) degrees
@@ -226,9 +248,85 @@ unverified against hardware -- calling any of them raises a `UserWarning`
 the first time (once per method, per process), naming the method and
 pointing back here.
 
-| Verified against real hardware | Wrapped, never called against hardware | Not wrapped |
-|---|---|---|
-| `connect`, `battery`, `coordinate`, `attitude`, `plane_id`, `takeoff`, `land`, `forward`, `back`, `left`, `right` | `up`, `down`, `turn_left`, `turn_right`, `hover`, `bounce`, `fly_to`, `circle`, `spin`, `flip`, `curve_to`, `set_obstacle_avoidance`, `follow_line`, `identify_tag`, `align_to_qrcode`, `recognize_qrcode`, `track_qrcode`, `read_color`, `set_light`, `open_video_window`, `set_video_stream`, `set_recording`, `take_photo`, `set_camera_angle`, `set_qr_positioning`, `fire_laser`, `laser_hit`, `set_electromagnet`, `set_clamp`, `arm`, `disarm`, `obstacles`, `acceleration`, `velocity`, `tof_height`, non-zero `Led` values | `Plane_fly_line_walking` (broken in `pyhula` itself -- see above) |
+| Verified against real hardware | Wrapped, never called against hardware | Attempted, not confirmed working | Not wrapped |
+|---|---|---|---|
+| `connect`, `battery`, `coordinate`, `attitude`, `plane_id`, `takeoff`, `land`, `forward`, `back`, `left`, `right`, `up`, `down`, `turn_left`, `turn_right`, `hover`, `bounce`, `fly_to`, `circle`, `spin`, `flip`, `curve_to`, `obstacles`, `acceleration`, `velocity`, `tof_height`, `set_obstacle_avoidance`, `identify_tag`, `align_to_qrcode`, `recognize_qrcode`, `track_qrcode`, `read_color`, `set_light` | `follow_line`, `set_qr_positioning`, `fire_laser`, `laser_hit`, `set_electromagnet`, `set_clamp`, `arm`, `disarm`, non-zero `Led` values | `open_video_window`, `set_video_stream`, `set_recording`, `take_photo`, `set_camera_angle` -- see below | `Plane_fly_line_walking` (broken in `pyhula` itself -- see above) |
+
+**The camera/video pipeline is broken, in at least two different ways
+depending on call order.** Neither path has ever produced a usable
+photo -- no image file has appeared anywhere in the repo, in the user's
+Pictures folder, or at any hardcoded path findable by grepping the
+compiled SDK modules for `.jpg`/`.png` strings.
+
+- **`open_video_window()` / `take_photo()` called *without*
+  `set_video_stream(True)` first:** fails fast with
+  `Could not find codec parameters for stream 0 (Video: h264, none):
+  unspecified size`, then a native assertion failure --
+  `Assertion desc failed at libswscale/swscale_internal.h:677` -- which
+  terminates the process on its own within a couple seconds. Not a hang.
+- **Same calls, but *with* `set_video_stream(True)` called first:** a
+  heavy, sustained flood of decoder errors (`non-existing PPS 0
+  referenced`, `decode_slice_header error`, `no frame!`) and RTP
+  packet-loss warnings (`RTP: missed 30 packets`, etc. -- so packets
+  genuinely are arriving, just not cleanly). How this resolves has
+  varied across runs: sometimes it never stops and Ctrl+C does nothing
+  (native C loop, not Python -- `Stop-Process -Force` / Task Manager is
+  the only way out); sometimes it eventually stops on its own; once,
+  Ctrl+C landing at the right moment (during the stepper's `input()`
+  prompt, which unlike the C loop *is* interruptible) did kill it. Not
+  reliable enough to depend on any one behavior.
+
+**Timing/warmup hypothesis: disproven.**
+[`camera_stream.py`](examples/camera_stream.py) added a 3s delay after
+`set_video_stream(True)` before touching the stream at all -- the flood
+started anyway, during that *second* warmup wait, before `take_photo()`
+was even called. That rules out call ordering or a slow-to-start encoder:
+it's `open_video_window()` (or a background thread it kicks off) that
+spams continuously on its own, independent of when anything downstream
+actually asks for a frame. `take_photo()` itself returned cleanly that
+run only because the flood happened to have quieted down by the time it
+ran, not because anything was fixed -- still no photo produced.
+
+At this point the evidence points at something on the drone's encoder or
+the WiFi link itself (the RTP packet-loss warnings support this) rather
+than anything fixable by changing call order or timing from the Python
+side. Worth trying if you want to dig further: moving closer to the
+router to rule out packet loss from marginal signal, since that's the
+one variable not yet isolated.
+
+There's also a `tmp.sdp` file (an RTP session description) that `pyhula`
+writes to the working directory, whose connection line looks truncated
+(`c=IN IP4 1` instead of a real address like `192.168.1.62`). That was
+the first theory for the root cause, but the "missed N packets" logs
+imply packets *are* reaching the decoder, which doesn't fit a totally
+wrong destination -- so this is a real oddity worth noting, not a
+confirmed explanation. Genuine root cause is still open. `tmp.sdp` is
+gitignored regardless (it's a regenerated runtime artifact).
+
+These five methods stay marked `@_untested` deliberately -- not raising
+in Python, and even the process eventually returning control, isn't the
+same as demonstrably working. If you want to chase this further: check
+whether `pyhula` exposes any way to set the stream's target IP
+explicitly (the SDP writer seems to be guessing). Note that
+`get_image_array()`, which shows up in some vendor documentation as the
+way to retrieve a captured frame directly, does **not** exist in the
+installed 1.1.4 -- it's a 1.1.7-only method, same story as `speed`.
+
+**`recognize_qrcode` is confirmed working, including genuine positive
+recognition** -- [`wait_for_qrcode.py`](examples/wait_for_qrcode.py)
+correctly detected a real QR panel multiple times. That confirms the
+earlier theory: the SDK's single-shot ~300ms recognition window was the
+whole problem, not a deeper bug -- a single call needs the panel already
+in view at that exact instant, which is unrealistic to time by hand, but
+trivial to solve by polling.
+
+`identify_tag`/`align_to_qrcode`/`track_qrcode` are still only verified
+for call mechanics, not confirmed for actual recognition -- they return
+the documented shape without crashing, including two prior single-shot
+attempts with real panels that came back `result: False` (most likely
+the same timing issue, now that polling is confirmed to fix it for
+`recognize_qrcode`). Worth trying the same polling approach on these
+three next.
 
 Also found while cross-referencing the vendor docs against the actually
 installed 1.1.4: `single_fly_Optical_flow_alignment`,
@@ -237,10 +335,13 @@ are documented in the Chinese V3 PDF but don't exist in any version
 published to PyPI -- same story as the `speed` parameter, vendor-exclusive
 1.1.7 only.
 
-When you do get a chance to test more of these (battery permitting):
-low-risk first -- the telemetry getters (`obstacles`, `acceleration`,
-`velocity`, `tof_height`) don't move the drone. Things like `arm()`
-(spins the propellers) deserve someone standing by first.
+When you get a chance to test more of these (battery permitting): the
+non-camera items left are `arm`/`disarm` (spins the propellers, so have
+someone standing by -- `electromagnet`/`clamp`/`laser` in the same script
+don't apply to this project's test unit, which doesn't have those
+attachments), `follow_line` (needs an actual line under the drone), and
+`set_qr_positioning` and non-zero `Led` colors (both now in
+`sensing_and_camera.py`).
 
 ## Known limitations
 
@@ -251,9 +352,12 @@ low-risk first -- the telemetry getters (`obstacles`, `acceleration`,
   single module-level value -- controlling two physical drones
   concurrently from one Python process isn't supported. Use separate
   processes if you need that.
-- No activation issue has been hit in practice, despite PyPI's `pyhula`
-  page stating the SDK "needs to be activated" -- connect, telemetry,
-  and flight all work without one so far.
+- **Activation currently requires the phone app**, not just Wi-Fi setup
+  (see "Network setup" above) -- matching PyPI's `pyhula` page, which
+  states the SDK "needs to be activated before it can be used." Once
+  activated through the app, no further activation step has been hit
+  from the SDK side -- connect, telemetry, and flight all work after
+  that without one.
 - **pyhula >=1.1.x hard-exits the whole process on low battery.** If the
   drone reports under 10%, `connect()` doesn't return `False` or raise --
   it prints `battery<10，退出程序` and terminates the process outright

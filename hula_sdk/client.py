@@ -128,54 +128,43 @@ class HulaDrone:
         for leg in (self.forward, self.right, self.back, self.left):
             leg(side_cm, speed)
 
-    # -- flight: wrapped, untested against hardware --------------------------
+    # -- flight: tested -----------------------------------------------------
 
-    @_untested
     def hover(self, seconds: float, led: Optional[Led] = None) -> None:
         self._api.single_fly_hover_flight(seconds, self._led_arg(led))
 
-    @_untested
     def up(self, height_cm: int, speed: Optional[int] = None, led: Optional[Led] = None) -> None:
         self._move("single_fly_up", height_cm, speed, led)
 
-    @_untested
     def down(self, height_cm: int, speed: Optional[int] = None, led: Optional[Led] = None) -> None:
         self._move("single_fly_down", height_cm, speed, led)
 
-    @_untested
     def turn_left(self, angle_deg: int, led: Optional[Led] = None) -> None:
         self._api.single_fly_turnleft(angle_deg, self._led_arg(led))
 
-    @_untested
     def turn_right(self, angle_deg: int, led: Optional[Led] = None) -> None:
         self._api.single_fly_turnright(angle_deg, self._led_arg(led))
 
-    @_untested
     def bounce(self, frequency: int, height_cm: int, led: Optional[Led] = None) -> None:
         self._api.single_fly_bounce(frequency, height_cm, self._led_arg(led))
 
-    @_untested
     def fly_to(self, x_cm: int, y_cm: int, z_cm: int, led: Optional[Led] = None) -> None:
         """Straight-line flight to relative coordinates (x, y, z) in cm."""
         self._api.single_fly_straight_flight(x_cm, y_cm, z_cm, self._led_arg(led))
 
-    @_untested
     def circle(self, radius_cm: int, led: Optional[Led] = None) -> None:
         """Fly a circle of the given radius. Positive = counterclockwise,
         negative = clockwise."""
         self._api.single_fly_radius_around(radius_cm, self._led_arg(led))
 
-    @_untested
     def spin(self, num_rotations: int, led: Optional[Led] = None) -> None:
         """Rotate in place. Positive = counterclockwise, negative =
         clockwise."""
         self._api.single_fly_autogyration360(num_rotations, self._led_arg(led))
 
-    @_untested
     def flip(self, direction: FlipDirection, led: Optional[Led] = None) -> None:
         self._api.single_fly_somersault(int(direction), self._led_arg(led))
 
-    @_untested
     def curve_to(
         self,
         x_cm: int,
@@ -188,9 +177,8 @@ class HulaDrone:
         body, y: back(-)/front(+) of body, z: down(-)/up(+)."""
         self._api.single_fly_curvilinearFlight(x_cm, y_cm, z_cm, counterclockwise, self._led_arg(led))
 
-    # -- sensing: wrapped, untested -------------------------------------------
+    # -- sensing: tested (except follow_line) ------------------------------------
 
-    @_untested
     def set_obstacle_avoidance(self, enabled: bool) -> None:
         self._api.single_fly_barrier_aircraft(enabled)
 
@@ -200,40 +188,38 @@ class HulaDrone:
         on failure, 1 on success, 2 on success but hit an intersection."""
         return self._api.single_fly_Line_walking(0, distance_cm, line_color)
 
-    @_untested
     def identify_tag(self, mode: int):
         """mode: 0-9 for digit tags, 10-13 for arrows (left/right/up/down),
         20 to end the task, 65-90 (ASCII) for uppercase letter tags.
         Returns a result with the tag's x/y/z/angle relative to the drone."""
         return self._api.single_fly_AiIdentifies(mode)
 
-    @_untested
     def align_to_qrcode(self, qr_id: int, sensor: QrSensor = QrSensor.CAMERA):
         return self._api.single_fly_Qrcode_align(int(sensor), qr_id)
 
-    @_untested
     def recognize_qrcode(self, qr_id: int, sensor: QrSensor = QrSensor.CAMERA):
         return self._api.single_fly_recognition_Qrcode(int(sensor), qr_id)
 
-    @_untested
     def track_qrcode(self, qr_id: int, seconds: float):
         return self._api.single_fly_track_Qrcode(qr_id, seconds)
 
-    @_untested
     def read_color(self, mode: int = 1):
         """Reads the color of one frame from the current video stream.
         Returns r/g/b plus a success flag."""
         return self._api.single_fly_getColor(mode)
 
-    # -- lighting: wrapped, untested -------------------------------------------
+    # -- lighting: tested -------------------------------------------------------
 
-    @_untested
     def set_light(self, led: Led, seconds: float) -> bool:
         """Sets LED color/mode without blocking flight. Unlike the `led`
         parameters elsewhere, this takes a duration."""
         return self._api.single_fly_lamplight(led.r, led.g, led.b, seconds, int(led.mode))
 
-    # -- camera / video: wrapped, untested -------------------------------------
+    # -- camera / video: wrapped, and *attempted* against hardware, but not
+    # verified working -- see the README's "Known limitations" for what
+    # happened. Still marked @_untested deliberately: something visibly
+    # went wrong, so these don't get to claim "tested" just because they
+    # didn't raise a Python exception.
 
     @_untested
     def open_video_window(self) -> None:
@@ -310,25 +296,19 @@ class HulaDrone:
     def plane_id(self) -> int:
         return self._api.get_plane_id()
 
-    # -- telemetry: wrapped, untested -----------------------------------------
-
-    @_untested
     def obstacles(self) -> dict:
         """{'forward': bool, 'back': bool, 'left': bool, 'right': bool} --
         True means an obstacle is present in that direction."""
         return self._api.Plane_getBarrier()
 
-    @_untested
     def acceleration(self) -> Tuple[int, int, int]:
         """[x, y, z] acceleration."""
         return tuple(self._api.get_accelerated_speed())
 
-    @_untested
     def velocity(self) -> Tuple[int, int, int]:
         """[x, y, z] body speed."""
         return tuple(self._api.get_plane_speed())
 
-    @_untested
     def tof_height(self) -> int:
         """Time-of-flight sensor height reading."""
         return self._api.get_plane_distance()
