@@ -17,3 +17,7 @@ vendor/
 # "Tested vs untested" -- its connection line is malformed, which is why
 # the video decoder never gets a valid frame).
 tmp.sdp
+
+# Output of running examples/working_video_stream.py -- a real captured
+# photo, not project source.
+photo.jpg

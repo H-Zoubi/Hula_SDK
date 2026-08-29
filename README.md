@@ -4,11 +4,14 @@ A working Python SDK for the [HighGreat](https://en.hg-fly.com) **HULA**
 educational drone.
 
 The vendor's own `pyhula` package has two undocumented bugs that make
-`connect()` fail outright on Windows. `hula-sdk` wraps `pyhula`, patches
-both bugs, and exposes a cleaner, typed API on top of it. Verified against
-real hardware on both `pyhula` 1.0.8 and the current PyPI release,
-1.1.4 -- see "Tested vs untested" for exactly which of the 47 `UserApi`
-methods that covers (33 of them, as of this writing).
+`connect()` fail outright on Windows, and its camera/video methods don't
+work at all. `hula-sdk` wraps `pyhula`, patches the connection bugs,
+exposes a cleaner typed API on top of it, and ships its own video
+receiver to replace the broken one. Verified against real hardware on
+both `pyhula` 1.0.8 and the current PyPI release, 1.1.4 -- see "Tested vs
+untested" for exactly which of the 47 `UserApi` methods that covers (33
+of them, as of this writing), and "The camera/video pipeline" for the
+video receiver.
 
 **This is not the official SDK.** `pyhula` itself is still HighGreat's,
 unmodified, installed straight from PyPI. Everything built on top of it
@@ -47,7 +50,11 @@ See `examples/` for runnable scripts:
 | [`sensing_and_camera.py`](examples/sensing_and_camera.py) | Interactively exercises QR/tag/color sensing and camera/video/lighting methods. Ground-based. |
 | [`attachments_and_extras.py`](examples/attachments_and_extras.py) | Interactively exercises arm/disarm, electromagnet, clamp, laser -- only meaningful if your drone has those attachments (this project's test unit doesn't). |
 | [`wait_for_qrcode.py`](examples/wait_for_qrcode.py) | Polls `recognize_qrcode()` in a loop until it gets a match or you Ctrl+C -- works around the SDK's short (~300ms) single-shot recognition window. |
-| [`camera_stream.py`](examples/camera_stream.py) | Tests (and disproves) a warmup-delay theory for the broken video pipeline. See "The camera/video pipeline" below. |
+| [`camera_stream.py`](examples/camera_stream.py) | Tests (and disproves) a warmup-delay theory for `pyhula`'s broken video pipeline. See "The camera/video pipeline" below. |
+| [`working_video_stream.py`](examples/working_video_stream.py) | `hula_sdk`'s own video receiver -- bypasses `pyhula`'s broken one entirely. Confirmed working: captures and saves a real photo. Needs a real `ffmpeg` on PATH. |
+| [`live_preview.py`](examples/live_preview.py) | Same receiver, continuous display in a window instead of one photo. Not yet separately verified. |
+| [`qr_in_air.py`](examples/qr_in_air.py) | Takes off and scans continuously for a QR code using `hula_sdk`'s own video stream + OpenCV (not the vendor's `recognize_qrcode()`), with a live preview window. |
+| [`land_on_qrcode.py`](examples/land_on_qrcode.py) | Takes off, calls `align_to_qrcode(sensor=OPTICAL_FLOW)` in a background thread with a bounded wait for a code on the floor, then lands regardless of whether it confirms. **This call's own completion signal has reliably failed to arrive** (though the alignment maneuver itself appears to complete) -- see "Tested vs untested" below. |
 
 The middle three use a shared `_stepper.py` helper: at each maneuver, Enter
 runs it, `s` skips it, `q` stops early. One step failing doesn't stop the
@@ -65,6 +72,8 @@ quit early or something raises mid-sequence.
 - The drone and this PC on the **same Wi-Fi network** ("networking
   mode" -- see below). `hula-sdk` does not work with the drone's own
   direct-connection hotspot; see "The bugs this fixes."
+- A real `ffmpeg` executable on PATH, **only** if you want `drone.video()`
+  (see "The camera/video pipeline"). Nothing else in `hula-sdk` needs it.
 
 All of `pyhula`'s own dependencies (`opencv-python`, `psutil`, `numpy`,
 etc.) are kept at the newest version that still ships a `cp36` wheel.
@@ -252,65 +261,139 @@ pointing back here.
 |---|---|---|---|
 | `connect`, `battery`, `coordinate`, `attitude`, `plane_id`, `takeoff`, `land`, `forward`, `back`, `left`, `right`, `up`, `down`, `turn_left`, `turn_right`, `hover`, `bounce`, `fly_to`, `circle`, `spin`, `flip`, `curve_to`, `obstacles`, `acceleration`, `velocity`, `tof_height`, `set_obstacle_avoidance`, `identify_tag`, `align_to_qrcode`, `recognize_qrcode`, `track_qrcode`, `read_color`, `set_light` | `follow_line`, `set_qr_positioning`, `fire_laser`, `laser_hit`, `set_electromagnet`, `set_clamp`, `arm`, `disarm`, non-zero `Led` values | `open_video_window`, `set_video_stream`, `set_recording`, `take_photo`, `set_camera_angle` -- see below | `Plane_fly_line_walking` (broken in `pyhula` itself -- see above) |
 
-**The camera/video pipeline is broken, in at least two different ways
-depending on call order.** Neither path has ever produced a usable
-photo -- no image file has appeared anywhere in the repo, in the user's
-Pictures folder, or at any hardcoded path findable by grepping the
-compiled SDK modules for `.jpg`/`.png` strings.
+**`pyhula`'s own camera/video methods are broken, in at least two
+different ways depending on call order** -- `set_video_stream`,
+`open_video_window`, `set_recording`, `take_photo`, `set_camera_angle`
+all stay marked `@_untested`, and this is now a closed investigation, not
+an open one:
 
-- **`open_video_window()` / `take_photo()` called *without*
-  `set_video_stream(True)` first:** fails fast with
-  `Could not find codec parameters for stream 0 (Video: h264, none):
-  unspecified size`, then a native assertion failure --
-  `Assertion desc failed at libswscale/swscale_internal.h:677` -- which
-  terminates the process on its own within a couple seconds. Not a hang.
-- **Same calls, but *with* `set_video_stream(True)` called first:** a
-  heavy, sustained flood of decoder errors (`non-existing PPS 0
-  referenced`, `decode_slice_header error`, `no frame!`) and RTP
-  packet-loss warnings (`RTP: missed 30 packets`, etc. -- so packets
-  genuinely are arriving, just not cleanly). How this resolves has
-  varied across runs: sometimes it never stops and Ctrl+C does nothing
-  (native C loop, not Python -- `Stop-Process -Force` / Task Manager is
-  the only way out); sometimes it eventually stops on its own; once,
-  Ctrl+C landing at the right moment (during the stepper's `input()`
-  prompt, which unlike the C loop *is* interruptible) did kill it. Not
-  reliable enough to depend on any one behavior.
+- **Without `set_video_stream(True)` first:** fails fast with
+  `Could not find codec parameters for stream 0`, then a native assertion
+  crash (`Assertion desc failed at libswscale/swscale_internal.h:677`)
+  that ends the process within a couple seconds.
+- **With `set_video_stream(True)` first:** a heavy, sustained flood of
+  decoder errors (`non-existing PPS 0 referenced`, `decode_slice_header
+  error`, `no frame!`), starting as soon as `open_video_window()` runs --
+  before anything downstream even asks for a frame. How it resolves is
+  inconsistent: sometimes it never stops (Ctrl+C does nothing -- it's a
+  native C loop, not Python; `Stop-Process -Force` / Task Manager is the
+  only way out), sometimes it stops on its own.
 
-**Timing/warmup hypothesis: disproven.**
-[`camera_stream.py`](examples/camera_stream.py) added a 3s delay after
-`set_video_stream(True)` before touching the stream at all -- the flood
-started anyway, during that *second* warmup wait, before `take_photo()`
-was even called. That rules out call ordering or a slow-to-start encoder:
-it's `open_video_window()` (or a background thread it kicks off) that
-spams continuously on its own, independent of when anything downstream
-actually asks for a frame. `take_photo()` itself returned cleanly that
-run only because the flood happened to have quieted down by the time it
-ran, not because anything was fixed -- still no photo produced.
+Two hypotheses were each tested directly and disproven, not just
+suspected:
 
-At this point the evidence points at something on the drone's encoder or
-the WiFi link itself (the RTP packet-loss warnings support this) rather
-than anything fixable by changing call order or timing from the Python
-side. Worth trying if you want to dig further: moving closer to the
-router to rule out packet loss from marginal signal, since that's the
-one variable not yet isolated.
+1. **Timing/warmup** -- [`camera_stream.py`](examples/camera_stream.py)
+   added a delay after enabling the stream before touching it. The flood
+   started anyway, during the warmup wait itself. Ruled out call
+   ordering or a slow-to-start encoder.
+2. **Malformed `tmp.sdp`** -- `pyhula` writes an RTP session description
+   with a truncated connection address (`c=IN IP4 1` instead of a real
+   IP). Pre-seeding a corrected file and making it **read-only** (so the
+   native writer couldn't overwrite it) changed nothing -- confirmed via
+   the file's own contents, untouched, after the exact same flood
+   happened anyway. Ruled out the SDP address.
 
-There's also a `tmp.sdp` file (an RTP session description) that `pyhula`
-writes to the working directory, whose connection line looks truncated
-(`c=IN IP4 1` instead of a real address like `192.168.1.62`). That was
-the first theory for the root cause, but the "missed N packets" logs
-imply packets *are* reaching the decoder, which doesn't fit a totally
-wrong destination -- so this is a real oddity worth noting, not a
-confirmed explanation. Genuine root cause is still open. `tmp.sdp` is
-gitignored regardless (it's a regenerated runtime artifact).
+What actually settled it: a **raw RTP packet capture**, bypassing
+`pyhula` entirely -- enable the stream, then read UDP port 9070 directly
+with a plain Python socket instead of letting `pyhula`'s decoder touch
+it. Result: **0% packet loss** (1356/1356 packets, fully contiguous
+sequence numbers), a normal ~1.76 Mbps bitrate, and both SPS and PPS
+genuinely present (7 of each, paired with 7 keyframes, over 8 seconds).
+The stream is completely intact on the wire. `pyhula`'s own
+`RTP: missed N packets` warnings were themselves wrong -- not a
+reflection of real network loss. The bug is entirely inside `pyhula`'s
+bundled ffmpeg wrapper's own demuxer/reassembly logic, which is compiled
+native code, not something patchable from Python.
 
-These five methods stay marked `@_untested` deliberately -- not raising
-in Python, and even the process eventually returning control, isn't the
-same as demonstrably working. If you want to chase this further: check
-whether `pyhula` exposes any way to set the stream's target IP
-explicitly (the SDP writer seems to be guessing). Note that
-`get_image_array()`, which shows up in some vendor documentation as the
-way to retrieve a captured frame directly, does **not** exist in the
-installed 1.1.4 -- it's a 1.1.7-only method, same story as `speed`.
+**So `hula_sdk` ships its own video receiver instead of trying to fix
+`pyhula`'s** -- [`hula_sdk/video.py`](hula_sdk/video.py) /
+[`hula_sdk/_rtp.py`](hula_sdk/_rtp.py), used via `drone.video()`. It
+receives RTP directly (the exact same socket-reading approach the
+diagnostic capture used), reassembles NAL units itself
+(`hula_sdk/_rtp.py` -- FU-A fragments and STAP-A aggregates per RFC
+6184, fully unit-tested with 10 tests, no hardware needed), and feeds the
+result to a real, separately-installed `ffmpeg` on PATH -- deliberately
+**not** `pyhula`'s bundled DLLs, which is what's actually broken.
+
+```python
+with HulaDrone(ip) as drone:
+    with drone.video() as video:
+        frame = video.read_frame()      # numpy BGR array
+        video.save_photo("photo.jpg")
+        video.show_live()               # continuous window, 'q' to quit
+```
+
+**Status: it works.** `save_photo()` -- and the whole receive → reassemble
+→ decode pipeline underneath it -- is confirmed against real hardware:
+[`working_video_stream.py`](examples/working_video_stream.py) captured
+and saved a real photo, something `pyhula`'s own `take_photo()` has never
+once managed to do across every attempt in this README. `show_live()`
+(continuous display, [`live_preview.py`](examples/live_preview.py)) is
+also confirmed working.
+
+**Latency, round 1:** the first version had substantial lag vs. the
+official app. Root cause: the decode loop processed every buffered JPEG
+frame in arrival order rather than jumping to the newest one -- if
+decoding fell even slightly behind the incoming ~30fps stream, the
+backlog just grew and the lag compounded over time. Fixed by scanning
+(cheap) past stale buffered frames to decode (expensive) only the latest
+one. Confirmed better, but still noticeable.
+
+**Latency, round 2:** switched ffmpeg's output from re-encoding every
+frame to MJPEG (so `cv2.imdecode` could read it) to raw decoded frames
+(`-f rawvideo -pix_fmt bgr24`) instead -- removes a whole extra encode
+pass per frame, replacing a JPEG decode with a cheap memory reshape.
+Frame dimensions are parsed once from ffmpeg's own stderr ("Video: ...
+WxH") rather than hardcoded.
+
+Two lower-latency ffmpeg flags were tried together (`-fflags nobuffer
+-flags low_delay`) and broke decoding entirely -- confirmed via a
+synthetic test, valid output without them, zero bytes with them. Testing
+each flag in isolation (same synthetic test) found the actual culprit
+was `-fflags nobuffer` alone; `-flags low_delay` on its own decodes
+fine. So the final set is `-flags low_delay` plus `-threads 1` (avoids
+frame-parallel decoding's inherent added latency) -- both individually
+confirmed safe, and confirmed safe together, all without `-fflags
+nobuffer`.
+
+Also fixed: the preview window's close (X) button didn't actually close
+it -- `cv2.imshow()` has no way to know a window was closed that way and
+just silently recreates it next frame; now checks
+`cv2.WND_PROP_VISIBLE` explicitly each loop.
+
+Verified two ways before spending any more of the drone's battery: a
+full integration test
+([`tests/test_video_integration.py`](tests/test_video_integration.py),
+skipped automatically if `ffmpeg` isn't on PATH) that exercises the real
+`VideoStream` code end to end over loopback with a synthetic RTP feed --
+and manual isolation of the broken flags against the same synthetic
+stream. **Confirmed against the real drone: noticeably better** after
+both latency rounds. Not quantified against the official app (no
+side-by-side timing), and not necessarily fully closed, but no longer
+the standout problem it was.
+
+**Latency, round 3 (not yet re-confirmed against the drone):** two
+further changes, both on the PC side rather than ffmpeg's:
+
+- `show_live()` was busy-spinning: `read_frame()` returns instantly on
+  every call once *any* frame has ever arrived (nothing cleared that
+  state), so the display loop was redecoding/redrawing the same stale
+  frame far faster than the ~30fps source, burning CPU the decode thread
+  could've used instead. Replaced the plain Event with a
+  `threading.Condition` + frame sequence counter, so `show_live()` now
+  genuinely blocks for the *next new* frame instead of spinning. Verified
+  directly: `tests/test_video_integration.py` now asserts the sequence
+  number actually advances between waits, not just that a frame comes
+  back.
+- `_stdout_loop`'s read size was a fixed 64KB regardless of resolution --
+  for anything above roughly 340x210 that's more than one syscall just
+  to accumulate a single frame (a 1280x720 frame is ~2.7MB, over 40
+  reads). Now reads in frame-sized chunks once dimensions are known.
+
+Note: `get_image_array()`, which shows up in some vendor documentation
+as a way to retrieve a frame directly from `pyhula` itself, does **not**
+exist in the installed 1.1.4 -- it's a 1.1.7-only method, same story as
+`speed`.
 
 **`recognize_qrcode` is confirmed working, including genuine positive
 recognition** -- [`wait_for_qrcode.py`](examples/wait_for_qrcode.py)
@@ -327,6 +410,30 @@ attempts with real panels that came back `result: False` (most likely
 the same timing issue, now that polling is confirmed to fix it for
 `recognize_qrcode`). Worth trying the same polling approach on these
 three next.
+
+**`align_to_qrcode(sensor=QrSensor.OPTICAL_FLOW)` specifically has been
+confirmed to hang reliably (multiple attempts), not just return
+`result: False`** -- see [`land_on_qrcode.py`](examples/land_on_qrcode.py).
+The traceback from Ctrl+C'ing it goes straight into `pyhula`'s own
+compiled code (`TaskController._wait_state` -> `Event.wait_for_signal`
+-> `threading.Condition.wait()`), meaning the task's completion signal
+never arrives -- not a Python-side bug, the vendor SDK's own wait never
+resolves for this call. `sensor=CAMERA` has not shown this; only the
+optical-flow mode has been tried and hung so far.
+
+Two things narrow down what's actually broken, though: on one hang,
+Ctrl+C'ing past it landed the drone right on the code -- meaning the
+*alignment maneuver itself* completes fine on the drone; only the
+Python-side wait for its completion signal is broken. And the earlier
+concern that interrupting the hang wedges the connection enough to
+make the following `land()` call also hang didn't reproduce on a later
+attempt -- `land()` returned cleanly. So the hang looks isolated to
+this one call's own confirmation signal, not a systemic connection
+problem, though `land()` needing a second Ctrl+C once is still a real
+data point, not nothing. `land_on_qrcode.py` now calls
+`align_to_qrcode()` in a background thread with a bounded wait instead
+of blocking on it directly, and proceeds to land regardless of whether
+confirmation ever arrives.
 
 Also found while cross-referencing the vendor docs against the actually
 installed 1.1.4: `single_fly_Optical_flow_alignment`,
@@ -374,18 +481,27 @@ venv\Scripts\python.exe -m unittest discover tests -v
 ```
 
 Tests cover the `_netfix` patch logic and `Led` conversion directly
-against real sockets, using RFC 5737 documentation-range addresses
-(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`), plus the
-`@_untested` warning mechanism against a fake `_api`. All of it is safe
-to run anywhere -- no drone, no real network, no `pyhula` install
-required.
+against real sockets (RFC 5737 documentation-range addresses --
+`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`), the `@_untested`
+warning mechanism against a fake `_api`, `hula_sdk._rtp`'s H.264
+reassembly (FU-A fragments, STAP-A aggregates) against hand-built RTP
+payloads, and a full `VideoStream` integration test that generates a
+synthetic H264 clip with `ffmpeg`'s own `testsrc` and feeds it through
+the real receive/reassemble/decode path over loopback (skipped
+automatically if `ffmpeg` isn't on PATH). None of it needs the drone or
+its battery -- what's *not* covered is whatever's specific to talking to
+the real drone's actual video encoder (see "The camera/video pipeline"
+for what's been verified there manually instead).
 
 ## Repository layout
 
 ```
-hula_sdk/        the package: client.py, led.py, constants.py, exceptions.py, _netfix.py
+hula_sdk/        the package: client.py, led.py, constants.py, exceptions.py,
+                 _netfix.py (the connection bug fixes), _rtp.py + video.py
+                 (hula_sdk's own video receiver)
 examples/        runnable scripts (see table above)
-tests/           unit tests, no hardware required
+tests/           unit + integration tests -- no drone required; the video
+                 integration test needs ffmpeg on PATH (skips without it)
 docs/            vendor PDFs + an English translation of the Chinese one
 vendor/          offline install media (Python 3.6 installer, DLLs, older
                  pyhula wheels) -- gitignored, kept locally for reference

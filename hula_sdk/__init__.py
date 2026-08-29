@@ -8,6 +8,7 @@ from .client import HulaDrone
 from .constants import FlipDirection, QrSensor
 from .exceptions import HulaConnectionError, HulaError
 from .led import Led, LedMode
+from .video import VideoStream, VideoStreamError
 
 __all__ = [
     "HulaDrone",
@@ -17,5 +18,7 @@ __all__ = [
     "LedMode",
     "FlipDirection",
     "QrSensor",
+    "VideoStream",
+    "VideoStreamError",
 ]
 __version__ = "0.1.0"
