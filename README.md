@@ -21,22 +21,61 @@ a human driving, debugging against real hardware, and reviewing).
 
 ## Quickstart
 
+### Before you start
+
+None of the following is something `hula-sdk` can do for you, and all of
+it has to be true before the install below is worth attempting. Each
+line links to the section with the full story.
+
+1. **Windows, with Python 3.6 specifically** -- not 3.7, not the
+   embeddable zip. Forced by `pyhula`'s compiled wheels, not a choice
+   this project makes. See [Requirements](#requirements).
+2. **The drone activated via the Hula phone app.** There is no SDK-side
+   or PC-side way to do this. See [Network setup](#network-setup).
+3. **The drone in networking mode, on the same Wi-Fi as this PC** --
+   solid green LED, not purple (its own hotspot, which does not work
+   here). Triple-press the power button to switch modes. Handing it your
+   Wi-Fi credentials is also phone-app-only. See
+   [Network setup](#network-setup).
+4. **The drone's IP address**, from your router's client list -- it
+   appears as something like `hg-<id>`. That's the string you pass to
+   `HulaDrone(...)` below; `192.168.1.62` is just this project's test
+   unit. See [Network setup](#network-setup).
+5. **The battery above 10%.** Under that, `pyhula` terminates your
+   process outright instead of returning an error -- there's nothing
+   `hula-sdk` can do to turn that into a catchable exception. See
+   [Known limitations](#known-limitations).
+
+None of it applies if you only want to run the test suite. That needs
+neither the drone nor `pyhula`, and isn't tied to Python 3.6 -- just
+`numpy` and `opencv-python`, plus `ffmpeg` for one integration test
+that skips itself without it. See [Development](#development).
+
+### Install
+
 ```bash
-git clone <this repo>
-cd hula-sdk
+git clone https://github.com/H-Zoubi/Hula_SDK.git
+cd Hula_SDK
 py -3.6 -m venv venv
 venv\Scripts\python.exe -m pip install -e .
 ```
 
+### Fly
+
 ```python
 from hula_sdk import HulaDrone
 
-with HulaDrone("192.168.1.62") as drone:
+with HulaDrone("192.168.1.62") as drone:   # <- your drone's IP
     print("battery:", drone.battery())
     drone.takeoff()
     drone.square(60)
     drone.land()
 ```
+
+[`connect_and_read_telemetry.py`](examples/connect_and_read_telemetry.py)
+is the gentler first run -- it connects and prints telemetry without
+leaving the ground, so it confirms steps 1-5 without any risk of a
+drone in the air.
 
 See `examples/` for runnable scripts:
 
