@@ -52,7 +52,7 @@ See `examples/` for runnable scripts:
 | [`wait_for_qrcode.py`](examples/wait_for_qrcode.py) | Polls `recognize_qrcode()` in a loop until it gets a match or you Ctrl+C -- works around the SDK's short (~300ms) single-shot recognition window. |
 | [`camera_stream.py`](examples/camera_stream.py) | Tests (and disproves) a warmup-delay theory for `pyhula`'s broken video pipeline. See "The camera/video pipeline" below. |
 | [`working_video_stream.py`](examples/working_video_stream.py) | `hula_sdk`'s own video receiver -- bypasses `pyhula`'s broken one entirely. Confirmed working: captures and saves a real photo. Needs a real `ffmpeg` on PATH. |
-| [`live_preview.py`](examples/live_preview.py) | Same receiver, continuous display in a window instead of one photo. Not yet separately verified. |
+| [`live_preview.py`](examples/live_preview.py) | Same receiver, continuous display in a window instead of one photo. Confirmed working against real hardware. |
 | [`qr_in_air.py`](examples/qr_in_air.py) | Takes off and scans continuously for a QR code using `hula_sdk`'s own video stream + OpenCV (not the vendor's `recognize_qrcode()`), with a live preview window. |
 | [`land_on_qrcode.py`](examples/land_on_qrcode.py) | Takes off, calls `align_to_qrcode(sensor=OPTICAL_FLOW)` in a background thread with a bounded wait for a code on the floor, then lands regardless of whether it confirms. **This call's own completion signal has reliably failed to arrive** (though the alignment maneuver itself appears to complete) -- see "Tested vs untested" below. |
 
@@ -492,6 +492,19 @@ automatically if `ffmpeg` isn't on PATH). None of it needs the drone or
 its battery -- what's *not* covered is whatever's specific to talking to
 the real drone's actual video encoder (see "The camera/video pipeline"
 for what's been verified there manually instead).
+
+One wrinkle worth knowing about in `tests/test_qrcode_detection.py`: how
+badly a frame has to be degraded before OpenCV's raw QR detector gives
+up is a property of the installed OpenCV, not of `hula_sdk`, and it
+moved between versions -- 5.0.0 reads motion blur that the pinned
+4.6.0.66 can't. So the test that proves `detect_qrcode()`'s enhanced
+retry pass genuinely recovers unreadable frames *searches* a grid of
+degradations for one where the raw pass fails and the enhanced pass
+succeeds, rather than hardcoding a single tuned point (an earlier
+version did hardcode one, and it passed on 4.6.0.66 while failing on
+5.0.0 even though `detect_qrcode()` was fine on both). The separate
+control-flow test -- that a raw miss is retried once, against an
+enhanced frame -- uses a stub detector and is version-independent.
 
 ## Repository layout
 
