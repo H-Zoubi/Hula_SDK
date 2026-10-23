@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <defs>
+    <radialGradient id="nvCircleFill" cx="45%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#123A5E"/>
+      <stop offset="100%" stop-color="#040D18"/>
+    </radialGradient>
+    <linearGradient id="nvRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="nvN" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#F5FBFF"/>
+      <stop offset="45%" stop-color="#9FC6E8"/>
+      <stop offset="100%" stop-color="#0B3D6B"/>
+    </linearGradient>
+  </defs>
+  <circle cx="30" cy="30" r="27" fill="url(#nvCircleFill)"/>
+  <circle cx="30" cy="30" r="26.5" fill="none" stroke="url(#nvRing)" stroke-width="2.4"/>
+  <circle cx="30" cy="30" r="23.2" fill="none" stroke="rgba(96,165,250,0.4)" stroke-width="0.8"/>
+  <path d="M17,45 L17,15 L23,15 L37,37 L37,15 L43,15 L43,45 L37,45 L23,23 L23,45 Z" fill="url(#nvN)" stroke="#EAF6FF" stroke-width="0.4" stroke-opacity="0.5"/>
+</svg>
