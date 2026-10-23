@@ -21,3 +21,7 @@ tmp.sdp
 # Output of running examples/working_video_stream.py -- a real captured
 # photo, not project source.
 photo.jpg
+
+# OS / office-suite clutter
+desktop.ini
+.~lock.*#

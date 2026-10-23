@@ -1,0 +1,259 @@
+--- page 0 ---
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Hula User Manual 
+(Revision date: January 30, 2024) 
+
+--- page 1 ---
+Table of Contents 
+1. Hula Quick Start Guide ................................................................................................................. 5 
+1.1 Disclaimer ............................................................................................................................ 5 
+1.2 Warnings ............................................................................................................................. 5 
+1.3 Flight limit ....................................
+--- page 2 ---
+6.4.3 Draw a vertical circle ............................................................................................. 36 
+6.4.4 One click bounce .................................................................................................... 36 
+6.4.5 One click fly around ............................................................................................... 37 
+6.4.6 Circle .........................................................................................................
+--- page 3 ---
+ 
+Tips 
+ 
+Hula is a professional indoor drone for artificial intelligence and 
+educational programming, with high requirements for the use methods 
+and use environment. In order to quickly understand the basic use 
+methods and various considerations of this Product and to improve the 
+efficiency and reduce various risks during use, please read the Hula User 
+Manual and the Hula Quick Start Guide carefully. 
+The Hula drone is suitable for ages 14 and above. Children should use it 
+under the super
+--- page 4 ---
+ 
+1. Hula Quick Start Guide 
+1.1 Disclaimer 
+1. Children under the age of 14 should use this Product under the supervision of an adult. 
+2. This Product is a multi-rotor aircraft that offers an easy flight experience when powered 
+normally and with all components undamaged. Please visit the official website of Shenzhen 
+HighGreat Innovation Technology Development Co., Ltd.(hereinafter referred to as 
+"HighGreat Innovation") to obtain the complete User Manual as well as the latest instructions 
+a
+--- page 5 ---
+1.3 Flight limit 
+The user acknowledges and agrees to be responsible for all consequences arising from the use of 
+the aircraft. 
+1. Fly NO higher than 10 meters above ground level. 
+2. Fly in conditions with wind speed below class 3. DO NOT fly outdoors during thunderstorms 
+or typhoon weather. 
+3. Indoor environments can be complex. When flying indoors, please assess thoroughly whether 
+the flight environment is safe. 
+4. Maintain a distance of at least 2 meters between the aircraft and any pe
+--- page 6 ---
+13. Shall withstand interference from industrial, scientific and medical (ISM) applications 
+radiating RF energy or other legitimate radio station (station) interference.   
+14. If harmful interference occurs to other legal radio stations (stations), the use shall be stopped 
+immediately, and measures shall be taken to eliminate the interference before the use can 
+continue.   
+15. The use of Hula in aircraft, radio observatories, meteorological radar stations, satellite earth 
+stations (includi
+--- page 7 ---
+ 
+1. Lamp cover 
+6. Battery 
+11. Obstacle Avoidance Adjustment 
+Knob 
+2. Infrared Obstacle Avoidance 
+Transmitter 
+7. Propeller 
+12. Reset Button 
+3. Gimbal/Front Camera 
+8. Motor 
+13. Expansion Serial Port 
+4. Laser Transmitter 
+9. Propeller Guard 
+14. Visual Positioning System 
+5. Micro USB Port 
+10. Power Button 
+15. Foot mats 
+ 
+1.6 Technical specifications 
+Specifications 
+Parameters 
+Aircraft 
+Weight(Battery included) 
+100 g (± 3 g) 
+Axle distance 
+128 mm 
+Aircraft dimensions 
+189.3 × 184.
+--- page 8 ---
+Weight 
+31 g 
+Storage temperature*⑤ 
+≤ 1 Month: -20°C~45°C 
+≤ 3 Month: -20°C~30°C 
+≤ 1 Year: 25°C ± 3°C 
+Laser  
+Wavelength 
+640nm 
+Camera 
+Photo 
+1920 × 1080P  
+Video 
+720P/30 fps*⑥ 
+Field of view 
+71° 
+Format 
+JPG, MP4 
+Charging 
+box  
+(optional) 
+Input voltage 
+5V  3A 
+Charging current 
+1.4 A 
+Control 
+software 
+Hula APP for mobile 
+IOS 15.0 or above and Android 11 or above 
+Hula APP for PAD 
+IOS 15.0 or above and Android 11 or above 
+Hula software version for 
+PC 
+64-bit operating system (Wi
+--- page 9 ---
+1.7 Install the battery 
+ 
+Insert the flight battery into the aircraft as shown. 
+Hold the aircraft body steady, place the side with a sticker of the battery facing downward, and 
+insert it into the battery compartment on the back of the aircraft. Push it in until you hear a click, 
+which indicates that the battery is properly installed. 
+1.8 Charge the battery 
+     
+ 
+① 
+Indicator for charging status on the battery, ②USB charging port, ③Indicator for 
+charging status on the charging box. 
+ 
+Us
+--- page 10 ---
+Please use a 5V 3A power adapter for the charging box. 
+1.9 Install the propellers 
+         
+ 
+ 
+When mounting, ensure that the gap between the bottom of the propeller cap and the motor is no 
+bigger than needed to insert the propeller removal tool. 
+ 
+ 
+Please note that the propeller blades with "75 mmR" markings should be installed 
+on the top left and bottom right sides of the aircraft nose, while the propeller blades 
+with "75 mm" markings should be installed on the top right and bottom lef
+--- page 11 ---
+ 
+1.10 Direct connection mode for aircraft connection 
+ 
+       
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Run the Hula APP, and when the aircraft status indicator stays solid green and the 
+APP indicates a successful connection to the aircraft, it means the aircraft is 
+successfully connected. 
+By default, the aircraft is set to the direct connection mode. If you have switched 
+modes, press the power button three times to switch back to the direct connection 
+mode. 
+ 
+Press and hold the power button 
+--- page 12 ---
+1.11 Mode switch 
+     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Direct connection mode: Connect the PC/mobile device directly to the aircraft WiFi and control 
+the aircraft using the Hula APP. 
+Networking mode: Connect both the PC/mobile device and the aircraft to your own router WiFi. 
+In networking mode, multiple aircrafts can network together to compete on the same stage. 
+ 
+ 
+ 
+ 
+While the aircraft is powered on, you can 
+press the power button three times 
+quickly to switch between the direct 
+connection mode and 
+--- page 13 ---
+ 
+1.12 Reset 
+ 
+1. Press and hold the reset button inside the reset hole for 5 seconds, and the aircraft WiFi will be 
+restored to factory settings. If the green light of the aircraft blinks fast after releasing, the aircraft 
+is reset successfully. 
+2. Press and hold the reset button inside the reset hole for 10 seconds to revert the firmware 
+version of the aircraft to the previous one. If the aircraft restarts automatically after releasing, the 
+aircraft is reset successfully. 
+ 
+ 
+DO NOT per
+--- page 14 ---
+ 
+1 、Use a special screwdriver for obstacle avoidance adjustment knob, insert the 
+adjustment screw hole, and turn the knob clockwise/counterclockwise to adjust the 
+obstacle avoidance distance in each of the four directions. 
+2、The obstacle avoidance distance can be reduced by turning the obstacle avoidance 
+adjustment 
+knob 
+clockwise. 
+Turn 
+the 
+obstacle 
+avoidance 
+adjustment 
+knob 
+counterclockwise to increase the obstacle avoidance distance. 
+ 
+ 
+DO NOT twist the knob violently in case yo

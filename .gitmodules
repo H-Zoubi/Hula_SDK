@@ -1,0 +1,21 @@
+[submodule "marketing/plugins/oit-droneproject_home"]
+	path = marketing/plugins/oit-droneproject_home
+	url = https://github.com/oit-droneproject/home.git
+[submodule "marketing/plugins/oit-droneproject_hula"]
+	path = marketing/plugins/oit-droneproject_hula
+	url = https://github.com/oit-droneproject/hula.git
+[submodule "marketing/plugins/oit-droneproject_hula_camera"]
+	path = marketing/plugins/oit-droneproject_hula_camera
+	url = https://github.com/oit-droneproject/hula_camera.git
+[submodule "marketing/plugins/oit-droneproject_hula_control"]
+	path = marketing/plugins/oit-droneproject_hula_control
+	url = https://github.com/oit-droneproject/hula_control.git
+[submodule "marketing/plugins/oit-droneproject_hula_install"]
+	path = marketing/plugins/oit-droneproject_hula_install
+	url = https://github.com/oit-droneproject/hula_install.git
+[submodule "marketing/plugins/oit-droneproject_hula_thread"]
+	path = marketing/plugins/oit-droneproject_hula_thread
+	url = https://github.com/oit-droneproject/hula_thread.git
+[submodule "marketing/plugins/oit-droneproject_vscode"]
+	path = marketing/plugins/oit-droneproject_vscode
+	url = https://github.com/oit-droneproject/vscode.git
